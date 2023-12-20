@@ -1,58 +1,85 @@
 /*
 * TODO: 
-*   - convert class representation in binary predicates? pros and cons?  
 *   - check 'form' (method body)
-*   - avoid classes with same name?
 *   - Si noti che le regole di unificazione Prolog si applicano a <value> ed al corpo del metodo (capire che vuol dire)
+*   - Il comportamento di make cambia a seconda di che cosa `e il primo argomento <instance-name> (capire che vuol dire)
+*   - convert class representation in binary predicates? pros and cons?  
+*   - 
 */
 
-def_class(Class, Parents) :-
-    atom(Class),
-    atm_list(Parents),
-    asserta(class(Class, Parents)).
+:- dynamic class/3.
+
 
 def_class(Class, Parents, Parts) :-
-    atom(Class),
-    atm_list(Parents),
-    cls_parts(Parts),
-    asserta(class(Class, Parents, Parts)).
+    \+ is_class(Class),
+    atomic_list(Parents),
+    valid_parts(Parts),
+    assertz(class(Class, Parents, Parts)).
+
+def_class(Class, Parents) :-
+    def_class(Class, Parents, Parts).
 
 
-atm_list([]).
+atomic_list([]).
 
-atm_list([H | T]) :-
-    atom(H),
-    atm_list(T).
+atomic_list([Head | Tail]) :-
+    atom(Head),
+    atomic_list(Tail).
 
 
-cls_parts([]).
+valid_parts([]).
 
-cls_parts([Field | Parts]) :-
+valid_parts([Field | Parts]) :-
     functor(Field, field, 2),
     arg(1, Field, Fname),
     atom(Fname),
-    cls_parts(Parts).
+    valid_parts(Parts).
 
-cls_parts([Field | Parts]) :- 
+valid_parts([Field | Parts]) :- 
     functor(Field, field, 3),
     arg(1, Field, Fname),
     atom(Fname),
-    cls_parts(Parts).
+    valid_parts(Parts).
 
-cls_parts([Method | Parts]) :- 
+valid_parts([Method | Parts]) :- 
     functor(Method, method, 3),
     arg(1, Method, Mname),
     atom(Mname),
     arg(2, Method, Args),
     var_list(Args),
-    cls_parts(Parts).
+    valid_parts(Parts).
 
 
 var_list([]).
 
-var_list([H | T]) :-
-    var(H),
-    var_list(T).
+var_list([Head | Tail]) :-
+    var(Head),
+    var_list(Tail).
 
 
-make(Iname, Cname).
+is_class(Cname) :-
+    atom(Cname),
+    class(Cname, _, _).
+
+
+make(Iname, Cname, Fields) :-
+    is_class(Cname),
+    asserta(instance(Iname, Cname, Fields)).
+
+make(Iname, Cname) :-
+    make(Iname, Cname, []).
+
+
+is_instance(Iname) :-
+    instance(Iname, _).
+
+is_instance(Iname, Parent) :-
+    atom(Parent),
+    instance(Iname, Cname),
+    class(Cname, Parents, _),
+    is_contained(Parent, Parents).
+    
+
+is_contained(X, [X | _]).
+is_contained(X, [_ | Ys]) :-
+    is_contained(X, Ys).
