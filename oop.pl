@@ -102,18 +102,18 @@ make(Iname, Cname, Fields) :-
     %%%% initialize fields
     asserta(instance(Iname, Cname, Fields)).
 
-make(Iname, Cname, Fields) :-
+make(Inst, Cname, Fields) :-
     var(Iname),
     !,
     is_class(Cname),
     %%%% initialize fields
-    Iname = instance(_, Cname, Fields).
+    Inst = instance(_, Cname, Fields).
 
 %%% same as 2nd case ???
-make(Iname, Cname, Fields) :-
+make(Inst, Cname, Fields) :-
     is_class(Cname),
     %%%% initialize fields
-    Iname = instance(_, Cname, Fields).
+    Inst = instance(_, Cname, Fields).
 
 make(Iname, Cname) :-
     make(Iname, Cname, []).
@@ -135,7 +135,17 @@ inst(Iname, Inst) :-
     atom(Iname),
     var(Inst),
     instance(Iname, Cname, Fields),
-    Inst =.. [instance, Iname, Cname, Fields]
+    %%% try to see what happens when not unifying 'Cname' and 'Fields'
+    Inst = instance(Iname, Cname, Fields).
+
+
+field(Iname, Fname, Result) :-
+    inst(Iname, Inst),
+    arg(2, Inst, Cname),
+    class(Cname, Parents, Fields, []),
+    member(field())
 
 
 %%% Instance helpers
+
+unifica(X, X).
