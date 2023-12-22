@@ -59,6 +59,20 @@ parents(Class, Parents) :-
     class(Class, Parents, _, _).
 
 
+full_parents(Class, ParentsAcc) :-
+    is_class(Class),
+    full_parents_aux([Class], [], ParentsAcc).
+
+
+full_parents_aux([], StackParentsAcc, StackParentsAcc).
+
+full_parents_aux([Parent | Parents], StackParentsAcc, ParentsAcc) :-
+    class(Parent, PParents, _, _),
+    append(Parents, PParents, NextStackParents),
+    append(StackParentsAcc, PParents, NextStackParentsAcc),
+    full_parents_aux(NextStackParents, NextStackParentsAcc, ParentsAcc).
+    
+
 fields(Class, Fields) :-
     is_class(Class),
     class(Class, _, Fields, _).
@@ -82,20 +96,20 @@ superclass([], _).
 
 :- dynamic instance/3.
 
-make(Iname, Cname, IFields) :-
+make(Iname, Cname, _) :-
     atom(Iname),
     !,
     \+ instance(Iname, _, _),
     is_class(Cname),
     %%% initialize fields
-    asserta(instance(Iname, Cname, Fields)).
+    asserta(instance(Iname, Cname, _)).
 
-make(Inst, Cname, Fields) :-
+make(Inst, Cname, _) :-
     var(Inst),
     !,
     is_class(Cname),
     %%% initialize fields
-    Inst = instance(_, Cname, Fields).
+    Inst = instance(_, Cname, _).
 
 %%% same as 2nd case ???
 make(Inst, Cname, Fields) :-
@@ -108,7 +122,7 @@ make(Iname, Cname) :-
 
 
 is_instance(Inst, Parent) :-
-    Inst = instance(Iname, Cname, Fields),
+    Inst = instance(_, Cname, Fields),
     is_class(Cname),
     %%% check fields ???
     superclass(Parent, Cname).
@@ -125,37 +139,15 @@ inst(Iname, Inst) :-
     Inst = instance(Iname, Cname, Fields).
 
 
-%%% reimplement
-field(Iname, Fname, Result) :-
-    inst(Iname, Inst),
-    arg(2, Inst, Cname),
-    class(Cname, Parents, Fields, []).
-
-
 %%% --------------------------------------------------
 %%% instance helper predicates
 
-inst_fields(Cname, Fields) :-
-    is_class(Cname),
-    fields(Cname, Fields),
-    parents(Cname, Parents),
-    inh_fields(Parents, Fields).
+gen_fields([], []).
 
-
-inh_fields([], Acc, Acc).
-
-inh_fields([Parent | Parents], Fields, Acc) :-
-    fields(Parent, Pfields),
-    append(Fields, Pfields, Acc).
-    inh_fields(Parents, Acc, Acc).
-
-
-super_chain([], Acc).
-
-super_chain([Cname | Cnames], [Cname | Acc]) :-
-    parents(Cname, Parents),
-    append(Cnames, Parents, Acc),
-    super_chain(Cnames, Acc).
+gen_fields([Cname | Cnames], [Fields | FieldsAcc]) :-
+    class(Cname, Parents, Fields, _),
+    append(Cnames, Parents, ParentsAcc),
+    gen_fields(ParentsAcc, FieldsAcc).
 
 
 %%% --------------------------------------------------
