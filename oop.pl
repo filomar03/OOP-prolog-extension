@@ -1,9 +1,16 @@
+class(entity, [], [field(id, 0, integer)], []).
+class(person, [entity], [field(name, 'Mario', string)], []).
+class(robot, [entity], [field(manufacturer, 'Xiaomi', string), field(version, '0.1.2', string)], []).
+class(cyborg, [person, robot], [field(tflops, 43, integer)], []).
+
 /*
 * TODO: 
 *   - disallow multiple fields or methods with same name
 *   - optimize with cuts
 *   - figure out third 'make' case (https://elearning.unimib.it/mod/forum/discuss.php?d=252585)
 *   - figure out which types are valid and how to handle their initialization
+*   - single field/method per name maintain last ovveridden?
+*   - cache per instance complete fields?
 *   - 
 */
 
@@ -35,10 +42,11 @@ is_class(Cname) :-
 parse_class([], [], []).
 
 parse_class([Part | Parts], [Part | Fields], Methods) :- 
-    Part = field(Fname, _, Type),
+    Part = field(Fname, Value, Type),
     !,
     atom(Fname),
     atom(Type),
+    %%% Type(Value),
     parse_class(Parts, Fields, Methods).
 
 parse_class([Part | Parts], Fields, Methods) :-
@@ -54,13 +62,7 @@ parse_class([Part | Parts], Fields, [Part | Methods]) :-
     parse_class(Parts, Fields, Methods).
 
 
-parents(Class, Parents) :-
-    is_class(Class),
-    class(Class, Parents, _, _).
-
-
 full_parents(Class, ParentsAcc) :-
-    is_class(Class),
     full_parents_aux([Class], [], ParentsAcc).
 
 
@@ -71,20 +73,12 @@ full_parents_aux([Parent | Parents], StackParentsAcc, ParentsAcc) :-
     append(Parents, PParents, NextStackParents),
     append(StackParentsAcc, PParents, NextStackParentsAcc),
     full_parents_aux(NextStackParents, NextStackParentsAcc, ParentsAcc).
-    
-
-fields(Class, Fields) :-
-    is_class(Class),
-    class(Class, _, Fields, _).
-
-
-methods(Class, Methods) :-
-    is_class(Class),
-    class(Class, _, _, Methods).
 
 
 superclass(Super, Class) :-
-    parents(Class, Parents),
+    atom(Super),
+    atom(Class),
+    class(Class, Parents, _, _),
     member(Super, Parents).
 
 %%% 'superclass([], _)' was created to allow 'is_instance(Inst)'
@@ -172,3 +166,18 @@ var_list([]).
 var_list([Head | Tail]) :-
     var(Head),
     var_list(Tail).
+
+
+list_to_set(List, Set) :-
+    list_to_set_aux(List, [], Set).
+
+
+list_to_set_aux([], Set, Set).
+
+list_to_set_aux([Head | Tail], StackSet, Set) :-
+    member(Head, StackSet),
+    list_to_set_aux(Tail, StackSet, Set).
+
+list_to_set_aux([Head | Tail], StackSet, Set) :-
+    append(StackSet, [Head], NewStackSet),
+    list_to_set_aux(Tail, NewStackSet, Set).
