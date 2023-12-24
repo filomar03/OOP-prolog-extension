@@ -18,12 +18,17 @@ class(cyborg, [person, robot], [field(tflops, 43, integer)], []).
 %%% Class predicates
 
 :- dynamic class/4.
+:- dynamic icache/2.
 
 def_class(Cname, Parents, Parts) :-
     atom(Cname),
     \+ class(Cname, _, _, _),
     class_list(Parents),
     parse_class(Parts, Fields, Methods),
+    get_superfields(Parents, SuperFields),
+    append(Fields, SuperFields, InstFields),
+    list_to_set(InstFields, InstFieldsSet),
+    assertz(icache(Cname, InstFieldsSet)),
     assertz(class(Cname, Parents, Fields, Methods)).
 
 def_class(Class, Parents) :-
@@ -38,15 +43,15 @@ is_class(Cname) :-
 %%% --------------------------------------------------
 %%% Class helper predicates
 
-%%% disallow multiple fields or methods with same name
 parse_class([], [], []).
 
+%%% invert order in which elements are parsed and transform to set
 parse_class([Part | Parts], [Part | Fields], Methods) :- 
     Part = field(Fname, Value, Type),
     !,
     atom(Fname),
     atom(Type),
-    %%% Type(Value),
+    call(Type, Value),
     parse_class(Parts, Fields, Methods).
 
 parse_class([Part | Parts], Fields, Methods) :-
@@ -62,17 +67,34 @@ parse_class([Part | Parts], Fields, [Part | Methods]) :-
     parse_class(Parts, Fields, Methods).
 
 
-full_parents(Class, ParentsAcc) :-
-    full_parents_aux([Class], [], ParentsAcc).
+get_superfields([], []).
+
+get_superfields(Parents, Fields) :-
+    get_superfields_aux(Parents, [], Fields).
 
 
-full_parents_aux([], StackParentsAcc, StackParentsAcc).
+get_superfields_aux([Parent | Parents], StackFields, FieldsAcc) :-
+    icache(Parent, ParentFields),
+    append(StackFields, ParentFields, NewStackFields),
+    get_superfields_aux(Parents, NewStackFields, FieldsAcc).
 
+get_superfields_aux([], FieldsAcc, FieldsSetAcc).
+
+
+%%% unused
+full_parents(Class, ParentsAccSet) :-
+    full_parents_aux([Class], [], ParentsAcc),
+    list_to_set(ParentsAcc, ParentsAccSet).    
+
+
+%%% unused
 full_parents_aux([Parent | Parents], StackParentsAcc, ParentsAcc) :-
     class(Parent, PParents, _, _),
     append(Parents, PParents, NextStackParents),
     append(StackParentsAcc, PParents, NextStackParentsAcc),
     full_parents_aux(NextStackParents, NextStackParentsAcc, ParentsAcc).
+
+full_parents_aux([], StackParentsAcc, StackParentsAcc).
 
 
 superclass(Super, Class) :-
@@ -121,7 +143,6 @@ is_instance(Inst, Parent) :-
     %%% check fields ???
     superclass(Parent, Cname).
 
-
 is_instance(Inst) :-
     is_instance(Inst, []).
 
@@ -136,12 +157,21 @@ inst(Iname, Inst) :-
 %%% --------------------------------------------------
 %%% instance helper predicates
 
-gen_fields([], []).
+%%% unused
+gen_inst_fields(Cname, FieldsAcc) :-
+    full_parents(Cname, Parents),
+    gen_inst_fields_aux(Parents, [], Fields),
+    class(Cname, _, ClassFields, _),
+    append(ClassFields, Fields, FullFields),
+    list_to_set(FullFields, FieldsAcc).
 
-gen_fields([Cname | Cnames], [Fields | FieldsAcc]) :-
-    class(Cname, Parents, Fields, _),
-    append(Cnames, Parents, ParentsAcc),
-    gen_fields(ParentsAcc, FieldsAcc).
+
+gen_inst_fields_aux([], Acc, Acc).
+
+gen_inst_fields_aux([Parent | Parents], StackFields, Acc) :-
+    class(Parent, _, ParentField, _),
+    append(StackFields, ParentField, NextStackFields),
+    gen_inst_fields_aux(Parents, NextStackFields, Acc).
 
 
 %%% --------------------------------------------------
@@ -168,16 +198,18 @@ var_list([Head | Tail]) :-
     var_list(Tail).
 
 
-list_to_set(List, Set) :-
-    list_to_set_aux(List, [], Set).
+%%% implement a function to compare custom elements
+list_to_set(List, Set, EqFun) :-
+    list_to_set_aux(List, [], Set, EqFun).
 
 
-list_to_set_aux([], Set, Set).
+list_to_set_aux([], Set, Set, _).
 
-list_to_set_aux([Head | Tail], StackSet, Set) :-
+%%% implement a 'Fun' parameter to compare compound elements
+list_to_set_aux([Head | Tail], StackSet, Set, EqFun) :-
     member(Head, StackSet),
-    list_to_set_aux(Tail, StackSet, Set).
+    list_to_set_aux(Tail, StackSet, Set, EqFun).
 
-list_to_set_aux([Head | Tail], StackSet, Set) :-
+list_to_set_aux([Head | Tail], StackSet, Set, EqFun) :-
     append(StackSet, [Head], NewStackSet),
-    list_to_set_aux(Tail, NewStackSet, Set).
+    list_to_set_aux(Tail, NewStackSet, Set, EqFun).
