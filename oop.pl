@@ -1,3 +1,7 @@
+%%% TODO: 
+%%%   - verify correctnes with tests
+%%%   - implement 3rd 'make' case
+
 %%% --------------------------------------------------
 %%% Class predicates
 
@@ -39,14 +43,15 @@ parse_class([Part | Parts], Fields, Methods) :-
     Part = field(Name, Value),
     parse_class([field(Name, Value, atom) | Parts], Fields, Methods).
 
-parse_class([Part | Parts], Fields, [Part | Methods]) :- 
+parse_class([Part | Parts], Fields, [method(Name, Args, PBody) | Methods]) :- 
     Part = method(Name, Args, Body),
     atom(Name),
     var_list(Args),
     callable(Body),
+    patch_body(Body, PBody),
     append([Name, This], Args, SignList),
     Sign =.. SignList,
-    Rule = (Sign :- get_method(Sign, X), Sign =.. [_, This | _], patch_body(X, This, Y), call(Y)),
+    Rule = (Sign :- get_method(Sign, Body), patch_body(Body, PBody), call(PBody)),
     assert(Rule),
     parse_class(Parts, Fields, Methods).
 
@@ -88,40 +93,39 @@ superclass_aux(Super, [Parent | Parents]) :-
     superclass_aux(Super, NextParents).
 
 
-patch_body(Body, This, PBody) :-
+patch_body(Body, PBody) :-
     Body =.. BodyList,
-    patch_body_aux(BodyList, This, PBody).
+    patch_body_aux(BodyList, PBody).
 
 
-patch_body_aux([Stmt | Stmts], This, PBody) :-
-    nonvar(Stmt),
+patch_body_aux([Stmt | Stmts], PBody) :-
+    % atom(Stmt),
     Stmt = ',',
-    patch_multiple(Stmts, This, PBodyList),
-    PBody =.. [',' | PBodyList].
+    patch_multiple(Stmts, PBody).
 
-patch_body_aux(StmtList, This, PStmt) :-
-    patch_single(StmtList, This, PStmtList),
+patch_body_aux(StmtList, PStmt) :-
+    patch_single(StmtList, PStmtList),
     PStmt =.. PStmtList.
 
 
-patch_multiple([Stmt | Stmts], This, [PStmt | PBody]) :-
+patch_multiple([Stmt | Stmts], [PStmt | PBody]) :-
     Stmt =.. StmtList,
-    patch_single(StmtList, This, PStmtList),
+    patch_single(StmtList, PStmtList),
     PStmt =.. PStmtList,
-    patch_multiple(Stmts, This, PBody).
+    patch_multiple(Stmts, PBody).
 
-patch_multiple([], _, []).
+patch_multiple([], []).
 
 
-patch_single([Term | Terms], This, [This | PStmtList]) :-
+patch_single([Term | Terms], [This | PStmtList]) :-
     atom(Term),
     Term = this,
-    patch_single(Terms, This, PStmtList).
+    patch_single(Terms, PStmtList).
 
-patch_single([Term | Terms], This, [Term | PStmtList]) :-
-    patch_single(Terms, This, PStmtList).
+patch_single([Term | Terms], [Term | PStmtList]) :-
+    patch_single(Terms, PStmtList).
 
-patch_single([], _, []).
+patch_single([], []).
 
 
 get_method(Sign, Body) :-
@@ -142,7 +146,7 @@ get_method_aux([Class | Parents], Sign, Body) :-
 
 match_msign([Method | _], Sign, Body) :-
     method(Name, Args, Body) = Method,
-    append([Name, _], Args, FoundSign),
+    append([Name, This], Args, FoundSign),
     Sign =.. FoundSign.
 
 match_msign([_ | Methods], Sign, Body) :-
