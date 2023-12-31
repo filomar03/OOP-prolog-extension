@@ -1,13 +1,6 @@
-/*
-* TODO: 
-*   - implement 'fieldx'
-*   - check fields in 'is_isntance'
-*   - methods implementation
-*   - patch 'this' in methods body
-*   - refactor names
-*   - verify correctnes with tests
-*   - implement 3rd 'make' case
-*/
+%%% TODO: 
+%%%   - verify correctnes with tests
+%%%   - implement 3rd 'make' case
 
 %%% --------------------------------------------------
 %%% Class predicates
@@ -20,10 +13,10 @@ def_class(Cname, Parents, Parts) :-
     \+ class(Cname, _, _, _),
     class_list(Parents),
     parse_class(Parts, Fields, Methods),
-    get_superfields(Parents, [], SuperFields),  %%% remove to disable instance fields caching
-    append(Fields, SuperFields, InstFields),    %%% remove to disable instance fields caching
-    list_to_set(InstFields, InstFieldsSet),     %%% remove to disable instance fields caching
-    assertz(icache(Cname, InstFieldsSet)),      %%% remove to disable instance fields caching
+    % get_superfields(Parents, [], SuperFields),  %%% remove to disable instance fields caching
+    % append(Fields, SuperFields, InstFields),    %%% remove to disable instance fields caching
+    % list_to_set(InstFields, InstFieldsSet),     %%% remove to disable instance fields caching
+    % assertz(icache(Cname, InstFieldsSet)),      %%% remove to disable instance fields caching
     assertz(class(Cname, Parents, Fields, Methods)).
 
 def_class(Class, Parents) :-
@@ -38,67 +31,126 @@ is_class(Cname) :-
 %%% --------------------------------------------------
 %%% Class helper predicates
 
-parse_class([], [], []).
-
+%%% if a field or method is defined multiple time, only the first one will be considered
 parse_class([Part | Parts], [Part | Fields], Methods) :- 
-    Part = field(Fname, Value, Type),
+    Part = field(Name, Value, Type),
     !,
-    atom(Fname),
+    atom(Name),
     call(Type, Value),
     parse_class(Parts, Fields, Methods).
 
 parse_class([Part | Parts], Fields, Methods) :-
-    Part = field(Fname, Value),
-    parse_class([field(Fname, Value, atom) | Parts], Fields, Methods).
+    Part = field(Name, Value),
+    parse_class([field(Name, Value, atom) | Parts], Fields, Methods).
 
-parse_class([Part | Parts], Fields, [Part | Methods]) :- 
-    Part = method(Mname, Args, Body),
-    atom(Mname),
+parse_class([Part | Parts], Fields, [method(Name, Args, PBody) | Methods]) :- 
+    Part = method(Name, Args, Body),
+    atom(Name),
     var_list(Args),
     callable(Body),
-    %%% patch 'this'
+    patch_body(Body, PBody),
+    append([Name, This], Args, SignList),
+    Sign =.. SignList,
+    Rule = (Sign :- get_method(Sign, Body), patch_body(Body, PBody), call(PBody)),
+    assert(Rule),
     parse_class(Parts, Fields, Methods).
 
+parse_class([], [], []).
 
-%%% currently using this predicate to retrieve superfields
-%%% because it's faster since it caches the result
-get_superfields([Parent | Parents], StackFields, FieldsAcc) :-
+
+%%% unused
+/* get_superfields([Parent | Parents], CurrentFields, FieldsAcc) :-
     icache(Parent, ParentFields),
-    append(StackFields, ParentFields, NewStackFields),
-    get_superfields(Parents, NewStackFields, FieldsAcc).
+    append(CurrentFields, ParentFields, NextFields),
+    get_superfields(Parents, NextFields, FieldsAcc).
 
-get_superfields([], FieldsAcc, FieldsAcc).
-
-
-get_superfields_nc([Parent | Parents], StackFields, FieldsAcc) :-
-    class(Parent, PParents, Fields, _),
-    append(Parents, PParents, NewStackParents),
-    append(StackFields, Fields, NewStackFields),
-    get_superfields_nc(NewStackParents, NewStackFields, FieldsAcc).
-
-get_superfields_nc([], Acc, Acc).
+get_superfields([], FieldsAcc, FieldsAcc). */
 
 
-/*
-full_parents(Class, ParentsAccSet) :-
-    full_parents_aux([Class], [], ParentsAcc),
-    list_to_set(ParentsAcc, ParentsAccSet).    
+get_superfields_nc(Cname, Acc) :-
+    get_superfields_nc_aux([Cname], [], Acc).
+    % list_to_set(Acc, Fields).
 
+get_superfields_nc_aux([Class | Parents], Fields, Acc) :-
+    class(Class, PParents, PFields, _),
+    append(Parents, PParents, NextParents),
+    append(Fields, PFields, NextFields),
+    get_superfields_nc_aux(NextParents, NextFields, Acc).
 
-full_parents_aux([Parent | Parents], StackParentsAcc, ParentsAcc) :-
-    class(Parent, PParents, _, _),
-    append(Parents, PParents, NextStackParents),
-    append(StackParentsAcc, PParents, NextStackParentsAcc),
-    full_parents_aux(NextStackParents, NextStackParentsAcc, ParentsAcc).
+get_superfields_nc_aux([], Acc, Acc).
 
-full_parents_aux([], StackParentsAcc, StackParentsAcc). 
-*/
 
 superclass(Super, Class) :-
     class(Class, Parents, _, _),
-    member(Super, Parents).
+    superclass_aux(Super, Parents).
 
-superclass([], _).
+
+superclass_aux(Super, [Super | _]).
+
+superclass_aux(Super, [Parent | Parents]) :-
+    class(Parent, PParents, _, _),
+    append(Parents, PParents, NextParents),
+    superclass_aux(Super, NextParents).
+
+
+patch_body(Body, PBody) :-
+    Body =.. BodyList,
+    patch_body_aux(BodyList, PBody).
+
+
+patch_body_aux([Stmt | Stmts], PBody) :-
+    % atom(Stmt),
+    Stmt = ',',
+    patch_multiple(Stmts, PBody).
+
+patch_body_aux(StmtList, PStmt) :-
+    patch_single(StmtList, PStmtList),
+    PStmt =.. PStmtList.
+
+
+patch_multiple([Stmt | Stmts], [PStmt | PBody]) :-
+    Stmt =.. StmtList,
+    patch_single(StmtList, PStmtList),
+    PStmt =.. PStmtList,
+    patch_multiple(Stmts, PBody).
+
+patch_multiple([], []).
+
+
+patch_single([Term | Terms], [This | PStmtList]) :-
+    atom(Term),
+    Term = this,
+    patch_single(Terms, PStmtList).
+
+patch_single([Term | Terms], [Term | PStmtList]) :-
+    patch_single(Terms, PStmtList).
+
+patch_single([], []).
+
+
+get_method(Sign, Body) :-
+    Sign =.. [_, Iname | _],
+    instance(Iname, Cname, _),
+    get_method_aux([Cname], Sign, Body).
+
+
+get_method_aux([Class | _], Sign, Body) :-
+    class(Class, _, _, Methods),
+    match_msign(Methods, Sign, Body).
+
+get_method_aux([Class | Parents], Sign, Body) :-
+    class(Class, PParents, _, _),
+    append(Parents, PParents, NewParents),
+    get_method_aux(NewParents, Sign, Body).
+
+
+match_msign([Method | _], Sign, Body) :-
+    method(Name, Args, Body) = Method,
+    append([Name, This], Args, FoundSign),
+    Sign =.. FoundSign.
+
+match_msign([_ | Methods], Sign, Body) :-
+    match_msign(Methods, Sign, Body).
 
 
 %%% --------------------------------------------------
@@ -110,9 +162,8 @@ make(Iname, Cname, Fields) :-
     atom(Iname),
     !,
     \+ instance(Iname, _, _),
-    icache(Cname, ClassFields),     %%% swap with 'get_superfields_nc/3',
-                                    %%% then add current class fields and transform to set
-                                    %%% when instance fields caching is disabled
+    % icache(Cname, ClassFields),             %%% use this when instance fields are cached
+    get_superfields_nc(Cname, ClassFields), %%% use this when instance fields are NOT cached
     ifields_2_fields(Fields, ConvFields),
     init_fields(ClassFields, ConvFields, InstFields),
     asserta(instance(Iname, Cname, InstFields)).
@@ -120,27 +171,31 @@ make(Iname, Cname, Fields) :-
 make(Inst, Cname, Fields) :-
     var(Inst),
     !,
-    icache(Cname, ClassFields),
+    % icache(Cname, ClassFields),             %%% use this when instance fields are cached
+    get_superfields_nc(Cname, ClassFields), %%% use this when instance fields are NOT cached
     ifields_2_fields(Fields, ConvFields),
     init_fields(ClassFields, ConvFields, InstFields),
     Inst = instance(_, Cname, InstFields).
 
 make(_, _, _) :-
     %%% implement logic
-    true().
+    fail().
 
 make(Iname, Cname) :-
     make(Iname, Cname, []).
 
 
-is_instance(Inst, Parent) :-
-    Inst = instance(_, Cname, _),
-    is_class(Cname),
-    %%% check fields ???
-    superclass(Parent, Cname).
-
 is_instance(Inst) :-
-    is_instance(Inst, []).
+    Inst = instance(_, Cname, Fields),
+    is_class(Cname),
+    % icache(Cname, ClassFields),             %%% use this when instance fields are cached
+    get_superfields_nc(Cname, ClassFields), %%% use this when instance fields are NOT cached
+    check_fields(Fields, ClassFields).
+
+is_instance(Inst, Parent) :-
+    is_instance(Inst),
+    instance(_, Cname, _) = Inst,
+    superclass(Parent, Cname).
 
 
 inst(Iname, Inst) :-
@@ -150,35 +205,58 @@ inst(Iname, Inst) :-
     Inst = instance(Iname, Cname, Fields).
 
 
+field(Iname, Fname, Result) :-
+    atom(Iname),
+    !,
+    inst(Iname, Inst),
+    atom(Fname),
+    Inst = instance(_, _, IFields),
+    member(field(Fname, Result, _), IFields).
+
+
 field(Inst, Fname, Result) :-
     is_instance(Inst),
     atom(Fname),
-    Inst = instance(_, Cname, Fields),
-    member(field(Fname, Result, _), Fields).
+    Inst = instance(_, _, IFields),
+    member(field(Fname, Result, _), IFields).
+
+
+fieldx(Inst, [Fname | Fnames], Result) :-
+    field(Inst, Fname, TmpResult),
+    fieldx(TmpResult, Fnames, Result).
+
+fieldx(Result, [], Result).
 
 
 %%% --------------------------------------------------
 %%% instance helper predicates
 
-ifields_2_fields([InstField | InstFields], [field(FName, FValue, any) | Fields]) :-
-    arg(1, InstField, FName),
-    arg(2, InstField, FValue),
-    ifields_2_fields(InstFields, Fields).
+ifields_2_fields([IField | IFields], [field(Name, Value, any) | Fields]) :-
+    arg(1, IField, Name),
+    arg(2, IField, Value),
+    ifields_2_fields(IFields, Fields).
 
 ifields_2_fields([], []).
 
 
-init_fields([ClassField | ClassFields], Fields, [field(Fname, Fvalue, Ftype) | FieldList]) :-
-    field(Fname, _, Ftype) = ClassField,
-    member(field(Fname, Fvalue, _), Fields),
+init_fields([CField | CFields], Fields, [field(Name, Value, Type) | FieldList]) :-
+    field(Name, _, Type) = CField,
+    member(field(Name, Value, _), Fields),
     !,
-    call(Ftype, Fvalue),
-    init_fields(ClassFields, Fields, FieldList).
+    call(Type, Value),
+    init_fields(CFields, Fields, FieldList).
 
-init_fields([ClassField | ClassFields], Fields, [ClassField | FieldList]) :-
-    init_fields(ClassFields, Fields, FieldList).
+init_fields([CField | CFields], Fields, [CField | FieldList]) :-
+    init_fields(CFields, Fields, FieldList).
 
 init_fields([], _, []).
+
+
+check_fields([field(Name, Value, Type) | Fields], [field(Name, _, Type) | CFields]) :-
+    call(Type, Value),
+    check_fields(Fields, CFields).
+
+check_fields([], []).
 
 
 %%% --------------------------------------------------
@@ -218,13 +296,3 @@ list_to_set_aux([Head | Tail], StackSet, Set) :-
 list_to_set_aux([Head | Tail], StackSet, Set) :-
     append(StackSet, [Head], NewStackSet),
     list_to_set_aux(Tail, NewStackSet, Set).
-
-
-%%% Tests
-
-:- def_class(entity, [], [field(id, 0, integer)]).
-:- def_class(person, [entity], [field(name, "Mario", string)]).
-:- def_class(robot, [entity], [field(manufacturer, "Xiaomi", string), field(version, "0.0.1", string)]).
-:- def_class(cyborg, [person, robot], [field(tflops, 12, integer)]).
-
-:- make(iborg, cyborg, [id = 999, manufacturer = "Apple", tflops = 42]).
