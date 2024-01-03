@@ -1,4 +1,6 @@
-%%% --------------------------------------------------
+%%%% Marini Filippo 900000
+%%%%
+
 %%% Class predicates
 
 :- dynamic class/4.     %%% represents the class object
@@ -9,10 +11,9 @@ def_class(Cname, Parents, Parts) :-
     \+ class(Cname, _, _, _),
     class_list(Parents),
     parse_class(Parts, Fields, Methods),
-    % get_superfields(Parents, [], SuperFields),  %%% remove to disable instance fields caching
-    % append(Fields, SuperFields, InstFields),    %%% remove to disable instance fields caching
-    % list_to_set(InstFields, InstFieldsSet),     %%% remove to disable instance fields caching
-    % assertz(icache(Cname, InstFieldsSet)),      %%% remove to disable instance fields caching
+    % get_superfields([Parents], [], SuperFields),  %%% This enables instance fields caching
+    % append(Fields, SuperFields, InstFields),      %%% 
+    % assertz(icache(Cname, InstFieldsSet)),        %%% 
     assertz(class(Cname, Parents, Fields, Methods)).
 
 def_class(Class, Parents) :-
@@ -27,7 +28,9 @@ is_class(Cname) :-
 %%% --------------------------------------------------
 %%% Class helper predicates
 
-%%% if a field or method is defined multiple time, only the first one will be considered
+%%% - when the type of a field is not specified, it is automatically set to 'atom'
+%%% - the order in which the parents are specified is important, because when non unique fields/methods are inherited
+%%%     only the first occurrence can actually be accessed 
 parse_class([Part | Parts], [Part | Fields], Methods) :- 
     Part = field(Name, Value, Type),
     !,
@@ -46,25 +49,24 @@ parse_class([Part | Parts], Fields, [Part | Methods]) :-
     callable(Body),
     append([Name, This], Args, SignList),
     Sign =.. SignList,
-    Rule = (Sign :- get_method(Sign, X), Sign =.. [_, This | _], patch_body(X, This, Y), call(Y)),
+    Rule = (Sign :- get_method(Sign, X), patch_body(X, This, Y), call(Y)), 
     assert(Rule),
     parse_class(Parts, Fields, Methods).
 
 parse_class([], [], []).
 
 
-%%% unused
-/* get_superfields([Parent | Parents], CurrentFields, FieldsAcc) :-
+%% unused
+get_superfields([Parent | Parents], CurrentFields, FieldsAcc) :-
     icache(Parent, ParentFields),
     append(CurrentFields, ParentFields, NextFields),
     get_superfields(Parents, NextFields, FieldsAcc).
 
-get_superfields([], FieldsAcc, FieldsAcc). */
+get_superfields([], FieldsAcc, FieldsAcc).
 
 
 get_superfields_nc(Cname, Acc) :-
     get_superfields_nc_aux([Cname], [], Acc).
-    % list_to_set(Acc, Fields).
 
 get_superfields_nc_aux([Class | Parents], Fields, Acc) :-
     class(Class, PParents, PFields, _),
@@ -88,6 +90,7 @@ superclass_aux(Super, [Parent | Parents]) :-
     superclass_aux(Super, NextParents).
 
 
+%%% - patch 'this' atom in function body, binding it to the variable 'This'
 patch_body(Body, This, PBody) :-
     Body =.. BodyList,
     patch_body_aux(BodyList, This, PBody).
@@ -124,9 +127,20 @@ patch_single([Term | Terms], This, [Term | PStmtList]) :-
 patch_single([], _, []).
 
 
+%%% - retrieves the body of the method with signature 'Sign'
+%%% - methods can be called with both: instance name or instance object itself
 get_method(Sign, Body) :-
     Sign =.. [_, Iname | _],
+    atom(Iname),
+    !,
     instance(Iname, Cname, _),
+    get_method_aux([Cname], Sign, Body).
+
+
+get_method(Sign, Body) :-
+    Sign =.. [_, Inst | _],
+    is_instance(Inst),
+    instance(_, Cname, _) = Inst,
     get_method_aux([Cname], Sign, Body).
 
 
@@ -158,8 +172,8 @@ make(Iname, Cname, Fields) :-
     atom(Iname),
     !,
     \+ instance(Iname, _, _),
-    % icache(Cname, ClassFields),             %%% use this when instance fields are cached
-    get_superfields_nc(Cname, ClassFields), %%% use this when instance fields are NOT cached
+    % icache(Cname, ClassFields),   %%% This enables instance fields caching
+    get_superfields_nc(Cname, ClassFields), 
     ifields_2_fields(Fields, ConvFields),
     init_fields(ClassFields, ConvFields, InstFields),
     asserta(instance(Iname, Cname, InstFields)).
@@ -167,15 +181,18 @@ make(Iname, Cname, Fields) :-
 make(Inst, Cname, Fields) :-
     var(Inst),
     !,
-    % icache(Cname, ClassFields),             %%% use this when instance fields are cached
-    get_superfields_nc(Cname, ClassFields), %%% use this when instance fields are NOT cached
+    % icache(Cname, ClassFields),   %%% This enables instance fields caching
+    get_superfields_nc(Cname, ClassFields),
     ifields_2_fields(Fields, ConvFields),
     init_fields(ClassFields, ConvFields, InstFields),
     Inst = instance(_, Cname, InstFields).
 
-make(_, _, _) :-
-    %%% implement logic
-    fail().
+make(Inst, Cname, Fields) :-
+    % icache(Cname, ClassFields),   %%% This enables instance fields caching
+    get_superfields_nc(Cname, ClassFields),
+    ifields_2_fields(Fields, ConvFields),
+    init_fields(ClassFields, ConvFields, InstFields),
+    Inst = instance(_, Cname, InstFields).
 
 make(Iname, Cname) :-
     make(Iname, Cname, []).
@@ -201,20 +218,17 @@ inst(Iname, Inst) :-
     Inst = instance(Iname, Cname, Fields).
 
 
-field(Iname, Fname, Result) :-
-    atom(Iname),
-    !,
-    inst(Iname, Inst),
-    atom(Fname),
-    Inst = instance(_, _, IFields),
-    member(field(Fname, Result, _), IFields).
-
-
 field(Inst, Fname, Result) :-
     is_instance(Inst),
     atom(Fname),
     Inst = instance(_, _, IFields),
     member(field(Fname, Result, _), IFields).
+
+field(Iname, Fname, Result) :-
+    atom(Iname),
+    !,
+    inst(Iname, Inst),
+    field(Inst, Fname, Result).
 
 
 fieldx(Inst, [Fname | Fnames], Result) :-
@@ -279,10 +293,12 @@ var_list([Head | Tail]) :-
     var_list(Tail).
 
 
+%%% unused
 list_to_set(List, Set) :-
     list_to_set_aux(List, [], Set).
 
 
+%%% unused
 list_to_set_aux([], Set, Set).
 
 list_to_set_aux([Head | Tail], StackSet, Set) :-
