@@ -150,7 +150,7 @@ get_superfields_nc(Cname, Acc) :-
 
 get_superfields_nc_aux([Class | Parents], Fields, Acc) :-
     class(Class, PParents, PFields, _),
-    append(Parents, PParents, NextParents),
+    append(PParents, Parents, NextParents),
     append(Fields, PFields, NextFields),
     get_superfields_nc_aux(NextParents, NextFields, Acc).
 

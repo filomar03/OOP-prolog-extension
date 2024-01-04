@@ -7,7 +7,9 @@ This Prolog extension introduces basic object-oriented programming concepts, all
 - `def_class/3`:
   - Parameters: `Cname` (class name), `Parents` (list of parent classes), `Parts` (list of class parts - fields/methods).
   - Usage: Defines a class with a unique name (`Cname`) having specified parent classes (`Parents`) and class parts (`Parts`), then asserts the class information into the database.
-  - Note: The class name `Cname` must be unique
+  - Note: 
+    - The class name `Cname` must be unique.
+    - Inheritance occurs by exploring the parents tree by depth.
 
 - `def_class/2`:
   - Parameters: `Class` (class name), `Parents` (list of parent classes).
