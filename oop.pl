@@ -7,18 +7,19 @@
 %%% --------------------------------------------------
 %%% exposed class predicates
 
-%%% defines a class object with a name, parents and fields/methods
+%%% define a class object with a name, parents and fields/methods
 %%% - class name must be unique
 %%% - when the type of a field is not specified,
 %%%     it is automatically set to 'atom'
-%%% - the order in which the parents are specified is important,
-%%%     because when non unique fields/methods are inherited
-%%%     only the first occurrence can actually be accessed 
+%%% - parents are explored by depth, so the order of parents is important
+%%% - when fields/methods with same signature/name are defined,
+%%%     only the first occurrence will be considered
+%%% - when inheriting a field, type must be the same or a subtype
 def_class(Cname, Parents, Parts) :-
     atom(Cname),
     \+ class(Cname, _, _, _),
     class_list(Parents),
-    parse_class(Parts, Fields, Methods),
+    parse_class(Parents, Parts, Fields, Methods),
     assertz(class(Cname, Parents, Fields, Methods)).
 
 def_class(Class, Parents) :-
@@ -34,10 +35,12 @@ is_class(Cname) :-
 %%% --------------------------------------------------
 %%% exposed instance predicates
 
-%%% creates an instance of <Cname>, allows fields initialization 
-%%%     and saves resulting instance in database as <Iname>
+%%% create an instance of the class <Cname>, allow fields initialization
+%%%     and save resulting instance in database as <Iname>
 %%%     or binds it to variable <Inst>
 %%% - to assert an instance it's name must be unique
+%%% - when a field is initialized multiple times
+%%%     only the first one will be considerated
 make(Iname, Cname, Fields) :-
     atom(Iname),
     !,
@@ -65,21 +68,22 @@ make(Iname, Cname) :-
     make(Iname, Cname, []).
 
 
-%%% verifies that <Inst> is a valid instance
-%%% - can check that <Parent> is a superclass of <Inst>
+%%% verify that <Inst> is a valid instance
 is_instance(Inst) :-
     Inst = instance(_, Cname, Fields),
     is_class(Cname),
     get_superfields_nc(Cname, ClassFields),
     check_fields(Fields, ClassFields).
 
-is_instance(Inst, Parent) :-
+%%% verify that <Inst> is a valid instance
+%%% and check that <Super> is a superclass of <Inst>
+is_instance(Inst, Super) :-
     is_instance(Inst),
     instance(_, Cname, _) = Inst,
-    superclass(Parent, Cname).
+    superclass(Super, Cname).
 
 
-%%% retrieves instance with name <Iname> from database
+%%% retrieve instance with name <Iname> from database
 inst(Iname, Inst) :-
     atom(Iname),
     var(Inst),
@@ -87,22 +91,22 @@ inst(Iname, Inst) :-
     Inst = instance(Iname, Cname, Fields).
 
 
-%%% get field with name <Fname> from <Inst> (instance)
+%%% retrieve field with name <Fname> from instance <Inst>
 field(Inst, Fname, Result) :-
     is_instance(Inst),
+    !,
     atom(Fname),
     Inst = instance(_, _, IFields),
     member(field(Fname, Result, _), IFields).
 
-%%% get field with name <Fname> from <Iname> (instance name)
+%%% retrieve field with name <Fname> from instance named <Iname>
 field(Iname, Fname, Result) :-
     atom(Iname),
-    !,
     inst(Iname, Inst),
     field(Inst, Fname, Result).
 
 
-%%% get a chain of fields from <Inst> (instance or instance name)
+%%% retrieve a chain of fields from instance or instance name <Inst>
 fieldx(Inst, [Fname | Fnames], Result) :-
     field(Inst, Fname, TmpResult),
     fieldx(TmpResult, Fnames, Result).
@@ -115,32 +119,53 @@ fieldx(Result, [], Result).
 
 %%% parse class fields/methods by dividing them to match 
 %%%     the class object layout
-%%% - checks field types
-%%% - creates dynamic methods definition (can be invoked with instance name
+%%% - check field types
+%%% - create dynamic methods definition (can be invoked with instance name
 %%%     or instance object itself) 
-parse_class([Part | Parts], [Part | Fields], Methods) :- 
+parse_class(Parents, [Part | Parts], [Part | Fields], Methods) :- 
     Part = field(Name, Value, Type),
     !,
     atom(Name),
-    call(Type, Value),
-    parse_class(Parts, Fields, Methods).
+    type(Value, Type),
+    check_subtype(Part, Parents),
+    parse_class(Parents, Parts, Fields, Methods).
 
-parse_class([Part | Parts], Fields, Methods) :-
+parse_class(Parents, [Part | Parts], Fields, Methods) :-
     Part = field(Name, Value),
-    parse_class([field(Name, Value, atom) | Parts], Fields, Methods).
+    !,
+    parse_class(Parents, [field(Name, Value, atom) | Parts], Fields, Methods).
 
-parse_class([Part | Parts], Fields, [Part | Methods]) :- 
+parse_class(Parents, [Part | Parts], Fields, [Part | Methods]) :- 
     Part = method(Name, Args, Body),
     atom(Name),
     var_list(Args),
     callable(Body),
     append([Name, This], Args, SignList),
     Sign =.. SignList,
-    Rule = (Sign :- get_method(Sign, X), patch_body(X, This, Y), call(Y)), 
-    assert(Rule),
-    parse_class(Parts, Fields, Methods).
+    ClauseBody = (get_method(Sign, X), patch_body(X, This, Y), call(Y)),
+    Clause = (Sign :- ClauseBody),
+    \+ clause(Sign, ClauseBody),
+    !,
+    assert(Clause),
+    parse_class(Parents, Parts, Fields, Methods).
 
-parse_class([], [], []).
+parse_class(Parents, [Part | Parts], Fields, [Part | Methods]) :- 
+    Part = method(Name, Args, Body),
+    atom(Name),
+    var_list(Args),
+    callable(Body),
+    parse_class(Parents, Parts, Fields, Methods).
+
+parse_class(_, [], [], []).
+
+
+check_subtype(field(Name, _, Type), Parents) :-
+    get_superfields_nc_aux(Parents, [], SuperFields),
+    member(field(Name, _, OldType), SuperFields),
+    !,
+    subtype(Type, OldType).
+
+check_subtype(_, _).
 
 
 %%% retrieves all fields of <Cname> (it's own plus
@@ -163,7 +188,7 @@ superclass(Super, Class) :-
     superclass_aux(Super, Parents).
 
 
-superclass_aux(Super, [Super | _]).
+superclass_aux(Super, [Super | _]) :- !.
 
 superclass_aux(Super, [Parent | Parents]) :-
     class(Parent, PParents, _, _),
@@ -171,21 +196,20 @@ superclass_aux(Super, [Parent | Parents]) :-
     superclass_aux(Super, NextParents).
 
 
-%%% patches body of a function by swapping 'this' atom
+%%% patch body of a function by swapping atom 'this'
 %%%     with variable <This>
-%%% - 'this' is only patched when used in a callable predicate
-%%%     example: 
-%%%      field(this, name, X)   valid!
-%%%      writeln(student(this), name, X)   NOT valid!
+%%% - 'this' is only patched when used in a callable predicates
+%%%     not in compounds
 patch_body(Body, This, PBody) :-
     Body =.. BodyList,
     patch_body_aux(BodyList, This, PBody).
 
 
-%%% differentiates when function body is only one statement or more
+%%% differentiate when function body is only one statement or more
 patch_body_aux([Stmt | Stmts], This, PBody) :-
     nonvar(Stmt),
     Stmt = ',',
+    !,
     patch_multiple(Stmts, This, PBodyList),
     PBody =.. [',' | PBodyList].
 
@@ -194,7 +218,7 @@ patch_body_aux(StmtList, This, PStmt) :-
     PStmt =.. PStmtList.
 
 
-%%% recursively patches multiple statements
+%%% recursively patche multiple statements
 patch_multiple([Stmt | Stmts], This, [PStmt | PBody]) :-
     Stmt =.. StmtList,
     patch_single(StmtList, This, PStmtList),
@@ -208,6 +232,7 @@ patch_multiple([], _, []).
 patch_single([Term | Terms], This, [This | PStmtList]) :-
     atom(Term),
     Term = this,
+    !,
     patch_single(Terms, This, PStmtList).
 
 patch_single([Term | Terms], This, [Term | PStmtList]) :-
@@ -216,7 +241,7 @@ patch_single([Term | Terms], This, [Term | PStmtList]) :-
 patch_single([], _, []).
 
 
-%%% retrieves the body of the method with matching signature
+%%% retrieve the body of the method with matching signature
 get_method(Sign, Body) :-
     Sign =.. [_, Iname | _],
     atom(Iname),
@@ -234,18 +259,20 @@ get_method(Sign, Body) :-
 
 get_method_aux([Class | _], Sign, Body) :-
     class(Class, _, _, Methods),
-    match_msign(Methods, Sign, Body).
+    match_msign(Methods, Sign, Body),
+    !.
 
 get_method_aux([Class | Parents], Sign, Body) :-
     class(Class, PParents, _, _),
-    append(Parents, PParents, NewParents),
+    append(PParents, Parents, NewParents),
     get_method_aux(NewParents, Sign, Body).
 
 
 match_msign([Method | _], Sign, Body) :-
     method(Name, Args, Body) = Method,
     append([Name, _], Args, FoundSign),
-    Sign =.. FoundSign.
+    Sign =.. FoundSign,
+    !.
 
 match_msign([_ | Methods], Sign, Body) :-
     match_msign(Methods, Sign, Body).
@@ -268,7 +295,7 @@ init_fields([CField | CFields], Fields, [field(Name, Value, Type) | FieldList]) 
     field(Name, _, Type) = CField,
     member(field(Name, Value, _), Fields),
     !,
-    call(Type, Value),
+    type(Value, Type),
     init_fields(CFields, Fields, FieldList).
 
 init_fields([CField | CFields], Fields, [CField | FieldList]) :-
@@ -279,7 +306,7 @@ init_fields([], _, []).
 
 %%% check that fields are the same (except for value)
 check_fields([field(Name, Value, Type) | Fields], [field(Name, _, Type) | CFields]) :-
-    call(Type, Value),
+    type(Value, Type),
     check_fields(Fields, CFields).
 
 check_fields([], []).
@@ -310,3 +337,49 @@ var_list([]).
 var_list([Head | Tail]) :-
     var(Head),
     var_list(Tail).
+
+
+type(_, any) :- !.
+
+type(Value, atom) :-
+    atom(Value),
+    !.
+
+type(Value, number) :-
+    number(Value),
+    !.
+
+type(Value, integer) :-
+    integer(Value),
+    !.
+
+type(Value, float) :-
+    float(Value),
+    !.
+
+type(Value, list) :-
+    is_list(Value),
+    !.
+
+type(Value, string) :-
+    string(Value),
+    !.
+
+type(Value, Cname) :-
+    is_class(Cname),
+    is_instance(Value),
+    !.
+
+type(Value, Cname) :-
+    is_class(Cname),
+    inst(Value, Inst),
+    is_instance(Inst).
+
+
+subtype(_, any) :- !.
+
+subtype(integer, number) :- !.
+
+subtype(float, number) :- !.
+
+subtype(Type, Type).

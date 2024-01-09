@@ -9,11 +9,14 @@ This Prolog extension introduces basic object-oriented programming concepts, all
   - Usage: Defines a class with a unique name (`Cname`) having specified parent classes (`Parents`) and class parts (`Parts`), then asserts the class information into the database.
   - Note: 
     - The class name `Cname` must be unique.
-    - Inheritance occurs by exploring the parents tree by depth.
+    - Fields with unspecified types are set to `atom`.
+    - Inheritance system traverse parents tree by depth.
+    - When fields/methods with same name/signature are defined multiple times in the same class, only the first occurrence will be considered.
+    - When inheriting a field, type must be the same or a subtype
 
 - `def_class/2`:
   - Parameters: `Class` (class name), `Parents` (list of parent classes).
-  - Usage: A shorthand for defining a class without specifying any fields or methods initially.
+  - Usage: A shorthand for defining a class without specifying any fields or methods.
 
 - `is_class/1`:
   - Parameters: `Cname` (class name).
@@ -24,39 +27,45 @@ This Prolog extension introduces basic object-oriented programming concepts, all
 - `make/3`:
   - Parameters: `Iname` (instance name), `Cname` (class name), `Fields` (list of initial field values).
   - Usage: Creates an instance of a class (`Cname`) with name (`Iname`), specified field values (`Fields`) and asserts the instance information into the database.
-  - Note: The instance name `Iname` must be unique
+  - Note: 
+    - The instance name `Iname` must be unique.
+    - When the same field is initialized multiple times only the first one will be considerated.
 
 - `make/3`:
-  - Parameters: `Inst` (resulting variable), `Cname` (class name), `Fields` (list of initial field values).
+  - Parameters: `Inst` (variable), `Cname` (class name), `Fields` (list of initial field values).
   - Usage: Creates an instance of a class (`Cname`) with specified field values (`Fields`) and binds it to the variable (`Inst`).
 
+- `make/3`:
+  - Parameters: `Inst` (instance), `Cname` (class name), `Fields` (list of initial field values).
+  - Usage: Creates an instance of a class (`Cname`) with specified field values (`Fields`) and checks if it the same as (`Inst`).
+
 - `make/2`:
-  - Parameters: `Iname` (instance name), `Cname` (class name).
-  - Usage: A shorthand for creating an instance without specifying any initial fields.
+  - Parameters: `Iname` (instance name / variable / instance ), `Cname` (class name).
+  - Usage: A shorthand for calling `make/3` without specifying any initial fields.
 
 - `is_instance/1`:
   - Parameters: `Inst` (instance).
   - Usage: Verifies that the given argument is a valid instance.
 
 - `is_instance/2`:
-  - Parameters: `Inst` (instance), `Parent` (parent class).
-  - Usage: Verifies that the instance is a valid instance of the specified parent class.
+  - Parameters: `Inst` (instance), `Super` (class name).
+  - Usage: Verifies that the instance is a valid instance and a subclass of `Super`. 
 
 - `inst/2`:
   - Parameters: `Iname` (instance name), `Inst` (instance).
   - Usage: Retrieves an instance with the given name from the database.
 
 - `field/3`:
-  - Parameters: `Inst` (instance), `Fname` (field name), `Result` (resulting value).
-  - Usage: Gets the value of the specified field from the given instance.
+  - Parameters: `Inst` (instance), `Fname` (field name), `Result` (variable).
+  - Usage: Gets the value of the specified field from the given instance and unifies it with `Result`.
 
 - `field/3`:
-  - Parameters: `Iname` (instance name), `Fname` (field name), `Result` (resulting value).
-  - Usage: Gets the value of the specified field from the instance with the given name.
+  - Parameters: `Iname` (instance name), `Fname` (field name), `Result` (variable).
+  - Usage: Gets the value of the specified field from the instance with the given name and unifies it with `Result`.
 
 - `fieldx/3`:
   - Parameters: `Inst` (instance), `Fnames` (list of field names), `Result` (resulting value).
-  - Usage: Gets a chain of fields from the given instance or instance name.
+  - Usage: Gets a chain of fields from the given instance or instance name, unifying to `Result`.
 
 **The following predicates are Not Meant for End-User**
 
@@ -64,14 +73,18 @@ This Prolog extension introduces basic object-oriented programming concepts, all
 
 - `parse_class/3`:
   - Parameters: `Parts` (list of class parts), `Fields` (resulting variable), `Methods` (resulting variable).
-  - Usage: Parses the class parts into fields and methods, handling field types and creating dynamic method definitions.
+  - Usage: Parses the class parts into fields and methods, handling field types and dynamic method definitions.
+
+- `check_subtype/2`:
+  - Parameters: `Field` (field), `Parents` (list of class names).
+  - Usage: checks that `Field` if inherited is a subtype of the inherited one.
 
 - `get_superfields_nc/2`:
-  - Parameters: `Cname` (class name), `Acc` (resulting variable).
+  - Parameters: `Cname` (class name), `Acc` (variable).
   - Usage: Retrieves all fields of a class (including inherited fields) and accumulates them.
 
 - `superclass/2`:
-  - Parameters: `Super` (superclass name), `Class` (class name).
+  - Parameters: `Super` (class name), `Class` (class name).
   - Usage: Checks if `Super` is a superclass of `Class`.
 
 - `patch_body/3`:
@@ -82,14 +95,21 @@ This Prolog extension introduces basic object-oriented programming concepts, all
 **Internal Instance Helper Predicates:**
 
 - `ifields_2_fields/2`:
-  - Parameters: `IFields` (list of initializers), `Fields` (resulting variable).
+  - Parameters: `IFields` (list of initializers), `Fields` (variable).
   - Usage: Converts a list of initializers from 'make' to 'field' objects.
 
 - `init_fields/3`:
-  - Parameters: `CFields` (list of class fields), `Fields` (list of initialized fields), `FieldList` (resulting variable).
-  - Usage: Creates a list of class fields (`CFields`), but uses values provided by initialized fields (`Fields`) .
+  - Parameters: `CFields` (list of fields), `Fields` (list of fields), `FieldList` (variable).
+  - Usage: Creates a list of class fields equal to `CFields`, but uses values provided by `Fields`.
 
 - `check_fields/2`:
   - Parameters: `Fields` (list of fields), `CFields` (list of class fields).
-  - Usage: Checks that fields are the same (except for values) based on their types.
+  - Usage: Checks that the 2 lists of fields (`Fields` and `CFields`) have the same fields (except from value).
   
+- `type/2`:
+  - Parameters: `Value` (value), `Type` (type).
+  - Usage: check that `Value` is the same type as `Type`, if `Type` is allowed.
+
+- `subtype/2`:
+  - Parameters: `Subtype` (type), `Type` (type).
+  - Usage: check if `Subtype` is a subtype of `Type`.
