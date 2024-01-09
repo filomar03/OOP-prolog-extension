@@ -1,0 +1,24 @@
+
+def_class(person, [], [field(name, 'Eve'), field(age, 21, integer)]).
+
+def_class(student, [person], [
+    field(name, 'Eva Lu Ator'), field(university, 'Berkeley'), method(talk, [], (
+        write('My name is '), field(this, name, N), writeln(N), write('My age is '), field(this, age, A), writeln(A))
+    )
+]).
+
+make(eve, person).
+
+make(adam, person, [name = 'Adam']).
+
+make(s1, student, [name = 'Eduardo De Filippo', age = 108]).
+
+field(eve, age, A).
+
+field(s1, age, A).
+
+field(eve, address, Address).
+
+talk(s1).
+
+talk(eve).

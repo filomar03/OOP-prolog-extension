@@ -97,7 +97,7 @@ field(Inst, Fname, Result) :-
     !,
     atom(Fname),
     Inst = instance(_, _, IFields),
-    member(field(Fname, Result, _), IFields).
+    contains(IFields, field(Fname, Result, _)).
 
 %%% retrieve field with name <Fname> from instance named <Iname>
 field(Iname, Fname, Result) :-
@@ -133,7 +133,7 @@ parse_class(Parents, [Part | Parts], [Part | Fields], Methods) :-
 parse_class(Parents, [Part | Parts], Fields, Methods) :-
     Part = field(Name, Value),
     !,
-    parse_class(Parents, [field(Name, Value, atom) | Parts], Fields, Methods).
+    parse_class(Parents, [field(Name, Value, any) | Parts], Fields, Methods).
 
 parse_class(Parents, [Part | Parts], Fields, [Part | Methods]) :- 
     Part = method(Name, Args, Body),
@@ -161,7 +161,7 @@ parse_class(_, [], [], []).
 
 check_subtype(field(Name, _, Type), Parents) :-
     get_superfields_nc_aux(Parents, [], SuperFields),
-    member(field(Name, _, OldType), SuperFields),
+    contains(SuperFields, field(Name, _, OldType)),
     !,
     subtype(Type, OldType).
 
@@ -201,44 +201,30 @@ superclass_aux(Super, [Parent | Parents]) :-
 %%% - 'this' is only patched when used in a callable predicates
 %%%     not in compounds
 patch_body(Body, This, PBody) :-
-    Body =.. BodyList,
-    patch_body_aux(BodyList, This, PBody).
+    Body = (Stmt, Stmts),
+    Stmt =.. List,
+    patch_stmt(List, This, PList),
+    PStmt =.. PList,
+    patch_body(Stmts, This, PBodyTail),
+    PBody = (PStmt, PBodyTail),
+    !.
+
+patch_body(Stmt, This, PStmt) :-
+    Stmt =.. List,
+    patch_stmt(List, This, PList),
+    PStmt =.. PList.
 
 
-%%% differentiate when function body is only one statement or more
-patch_body_aux([Stmt | Stmts], This, PBody) :-
-    nonvar(Stmt),
-    Stmt = ',',
-    !,
-    patch_multiple(Stmts, This, PBodyList),
-    PBody =.. [',' | PBodyList].
-
-patch_body_aux(StmtList, This, PStmt) :-
-    patch_single(StmtList, This, PStmtList),
-    PStmt =.. PStmtList.
-
-
-%%% recursively patche multiple statements
-patch_multiple([Stmt | Stmts], This, [PStmt | PBody]) :-
-    Stmt =.. StmtList,
-    patch_single(StmtList, This, PStmtList),
-    PStmt =.. PStmtList,
-    patch_multiple(Stmts, This, PBody).
-
-patch_multiple([], _, []).
-
-
-%%% patch a single statement
-patch_single([Term | Terms], This, [This | PStmtList]) :-
+patch_stmt([Term | Terms], This, [This | PList]) :-
     atom(Term),
     Term = this,
     !,
-    patch_single(Terms, This, PStmtList).
+    patch_stmt(Terms, This, PList).
 
-patch_single([Term | Terms], This, [Term | PStmtList]) :-
-    patch_single(Terms, This, PStmtList).
+patch_stmt([Term | Terms], This, [Term | PList]) :-
+    patch_stmt(Terms, This, PList).
 
-patch_single([], _, []).
+patch_stmt([], _, []).
 
 
 %%% retrieve the body of the method with matching signature
@@ -293,7 +279,7 @@ ifields_2_fields([], []).
 %%% initialize instance fields with values 'make' (converted by 'ifields_2_fields')
 init_fields([CField | CFields], Fields, [field(Name, Value, Type) | FieldList]) :-
     field(Name, _, Type) = CField,
-    member(field(Name, Value, _), Fields),
+    contains(Fields, field(Name, Value, _)),
     !,
     type(Value, Type),
     init_fields(CFields, Fields, FieldList).
@@ -383,3 +369,9 @@ subtype(integer, number) :- !.
 subtype(float, number) :- !.
 
 subtype(Type, Type).
+
+
+contains([El | _], El) :- !.
+
+contains([_ | Tail], El) :-
+    contains(Tail, El).
