@@ -1,7 +1,6 @@
 %%%% Marini Filippo 900000
 %%%%
 
-%%%% sistemare check_fields
 
 :- dynamic class/4.     %%% represents the class object
 :- dynamic instance/3.  %%% represent the instance object
@@ -60,12 +59,14 @@ make(Iname, Cname) :-
     make(Iname, Cname, []).
 
 
-%%% is_instance/1 verifies that `Inst` is a valid instance or a name for a valid instance
+%%% is_instance/1 verifies that `Inst` is a valid instance
 is_instance(Inst) :-
-    instance(_, Cname, Fields) = Inst.
+    instance(_, Cname, Fields) = Inst,
+    get_superfields_nc(Cname, CFields),
+    check_fields(Fields, CFields).
 
 
-%%% is_instance/2: verifies that `Inst` is a valid instance or a name for a valid instance, then verifies that class named `Super` is a super-class of `Inst` class. 
+%%% is_instance/2: verifies that `Inst` is a valid instance, then verifies that class named `Super` is a super-class of `Inst` class. 
 is_instance(Inst, Super) :-
     is_instance(Inst),
     instance(_, Cname, _) = Inst,
@@ -94,7 +95,7 @@ field(Inst, Fname, Result) :-
     contains(field(Fname, Result, _), IFields).
 
 
-%%% fieldx/3: gets the value of the first field specified in `Fnames` from the instance / instance named `Inst` and recursively uses it to extract the next field until the last one, which is then unified with `Result`.
+%%% fieldx/3: gets the value of the first field specified in `Fnames` from the instance `Inst` and recursively uses it to extract the next field until the last one, which is then unified with `Result`.
 fieldx(Inst, [Fname | Fnames], Result) :-
     field(Inst, Fname, TmpResult),
     fieldx(TmpResult, Fnames, Result).
@@ -141,6 +142,7 @@ parse_class(Parents, [Part | Parts], Fields, [Part | Methods]) :-
     parse_class(Parents, Parts, Fields, Methods).
 
 parse_class(_, [], [], []).
+
 
 %%% check_subtype/2: checks that the field `Field` if inherited is a subtype or the same type as the inherited one.
 check_subtype(_, []) :- !.
@@ -267,12 +269,25 @@ init_fields([field(Name, Value, _) | Fields], CFields, [field(Name, Value, Type)
 init_fields([], CFields, CFields).
 
 
-%%% check that fields are the same (except for value)
-check_fields([field(Name, Value, Type) | IFields], [field(Name, _, Type) | CFields]) :-
-    is_type(Value, Type),
-    check_fields(IFields, CFields).
+%%% check_fields/2: checks that instance fields are the same as class fields (except for value)
+check_fields(Ifields, Cfields) :-
+    check_cfields(Cfields, Ifields),
+    check_ifields(Ifields, Cfields).
 
-check_fields([], _).
+
+check_cfields([field(Name, _, Type) | Cfields], Ifields) :-
+    contains(field(Name, Value, Type), Ifields),
+    is_type(Value, Type),
+    check_cfields(Cfields, Ifields).
+
+check_cfields([], _).
+
+
+check_ifields([field(Name, _, Type) | Ifields], Cfields) :-
+    contains(field(Name, _, Type), Cfields),
+    check_ifields(Ifields, Cfields).
+
+check_ifields([], _).
 
 
 %%% --------------------------------------------------
