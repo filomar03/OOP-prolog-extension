@@ -1,6 +1,8 @@
 %%%% Marini Filippo 900000
 %%%%
 
+%%%% sistemare check_fields
+
 :- dynamic class/4.     %%% represents the class object
 :- dynamic instance/3.  %%% represent the instance object
 
@@ -13,7 +15,8 @@ def_class(Cname, Parents, Parts) :-
     \+ class(Cname, _, _, _),
     class_list(Parents),
     parse_class(Parents, Parts, Fields, Methods),
-    assertz(class(Cname, Parents, Fields, Methods)).
+    assertz(class(Cname, Parents, Fields, Methods)),
+    !.
 
 def_class(Class, Parents) :-
     def_class(Class, Parents, []).
@@ -34,7 +37,7 @@ make(Iname, Cname, Fields) :-
     \+ instance(Iname, _, _),
     get_superfields_nc(Cname, ClassFields), 
     ifields_2_fields(Fields, ConvFields),
-    init_fields(ClassFields, ConvFields, InstFields),
+    init_fields(ConvFields, ClassFields, InstFields),
     asserta(instance(Iname, Cname, InstFields)).
 
 %%% make/3: creates an instance of a class `Cname` and fields initialized from `Fields` then binds it to `Inst`.
@@ -43,13 +46,13 @@ make(Inst, Cname, Fields) :-
     !,
     get_superfields_nc(Cname, ClassFields),
     ifields_2_fields(Fields, ConvFields),
-    init_fields(ClassFields, ConvFields, InstFields),
+    init_fields(ConvFields, ClassFields, InstFields),
     Inst = instance(_, Cname, InstFields).
 
 make(Inst, Cname, Fields) :-
     get_superfields_nc(Cname, ClassFields),
     ifields_2_fields(Fields, ConvFields),
-    init_fields(ClassFields, ConvFields, InstFields),
+    init_fields(ConvFields, ClassFields, InstFields),
     Inst = instance(_, Cname, InstFields).
 
 
@@ -59,27 +62,14 @@ make(Iname, Cname) :-
 
 %%% is_instance/1 verifies that `Inst` is a valid instance or a name for a valid instance
 is_instance(Inst) :-
-    instance(_, Cname, Fields) = Inst,
-    !,
-    get_superfields_nc(Cname, ClassFields),
-    check_fields(Fields, ClassFields).
-
-is_instance(Iname) :-
-    inst(Iname, Inst),
-    is_instance(Inst).
+    instance(_, Cname, Fields) = Inst.
 
 
 %%% is_instance/2: verifies that `Inst` is a valid instance or a name for a valid instance, then verifies that class named `Super` is a super-class of `Inst` class. 
 is_instance(Inst, Super) :-
-    Inst = instance(_, _, _)
-    !,
     is_instance(Inst),
     instance(_, Cname, _) = Inst,
     is_instance_aux(Super, Cname).
-
-is_instance(Iname, Super) :-
-    inst(Iname, Inst),
-    is_instance(Inst, Super).
 
 
 is_instance_aux(Super, Super) :- !.
@@ -98,16 +88,10 @@ inst(Iname, Inst) :-
 
 %%% field/3: gets the value of the field named `Fname` from the given instance `Inst` and unifies it with `Result`.
 field(Inst, Fname, Result) :-
-    instance(_, _, _) = Inst,
-    !,
     is_instance(Inst),
     atom(Fname),
     instance(_, _, IFields) = Inst,
     contains(field(Fname, Result, _), IFields).
-
-field(Iname, Fname, Result) :-
-    inst(Iname, Inst),
-    field(Inst, Fname, Result).
 
 
 %%% fieldx/3: gets the value of the first field specified in `Fnames` from the instance / instance named `Inst` and recursively uses it to extract the next field until the last one, which is then unified with `Result`.
@@ -165,7 +149,8 @@ check_subtype(field(Name, _, Type), Parents) :-
     get_superfields_nc_aux(Parents, [], SuperFields),
     contains(field(Name, _, OldType), SuperFields),
     !,
-    subtype(Type, OldType).
+    subtype(Type, OldType),
+    !.
 
 check_subtype(_, _).
 
@@ -274,18 +259,12 @@ ifields_2_fields([], []).
 
 
 %%% init_fields/3: creates a list of fields equal to `CFields`, but uses values provided by `Fields` then binds them to `FieldList`.
-init_fields(CFields, [], CFields) :- !.
-
-init_fields([field(Name, _, Type) | CFields], Fields, [field(Name, Value, Type) | FieldList]) :-
-    contains(field(Name, Value, _), Fields),
-    !,
+init_fields([field(Name, Value, _) | Fields], CFields, [field(Name, Value, Type) | FieldList]) :-
+    contains(field(Name, _, Type), CFields),
     is_type(Value, Type),
-    init_fields(CFields, Fields, FieldList).
+    init_fields(Fields, CFields, FieldList).
 
-init_fields([CField | CFields], Fields, [CField | FieldList]) :-
-    init_fields(CFields, Fields, FieldList).
-
-init_fields([], _, []).
+init_fields([], CFields, CFields).
 
 
 %%% check that fields are the same (except for value)
@@ -362,24 +341,26 @@ is_type(Value, Cname) :-
 
 is_type(Value, Type) :-
     subtype(SubType, Type),
+    SubType \= Type,
     is_type(Value, SubType).
 
 
 %%% used to determines types relations
-subtype(SubType, Type) :-
-    is_class(Type),
-    !,
-    superclass(Type, SubType).
+subtype(SubType, SubType).
 
 subtype(SubType, Type) :-
     type_chain(SubType, Type).
 
 subtype(SubType, Type) :-
-    Type \= any,
     type_chain(X, Type),
-    subtype(SubType, X).
+    nonvar(X),
+    subtype(SubType, X),
+    SubType \= X.
 
-subtype(SubType, SubType).
+subtype(SubType, Type) :-
+    is_class(Type),
+    superclass(Type, SubType).
+
 
 %%% defines the subtype relations (one-on-one) 
 type_chain(integer, float).
