@@ -1,5 +1,5 @@
 %%%% Marini Filippo 900000
-%%%%
+%%%% Zheng Lei Maurizio 866251, Moretti Simone 894672
 
 
 :- dynamic class/4.     %%% represents the class object
@@ -270,7 +270,8 @@ match_msign([_ | Methods], Sign, Body) :-
 
 %%% ifields_2_fields/2: converts a list of `initializers` to `fields`
 %%% then binds them to `Field`. 
-ifields_2_fields([Name = Value | IFields], [field(Name, Value, any) | Fields]) :-
+ifields_2_fields([Name = Value | IFields],
+		 [field(Name, Value, any) | Fields]) :-
     ifields_2_fields(IFields, Fields).
 
 ifields_2_fields([], []).
@@ -278,7 +279,8 @@ ifields_2_fields([], []).
 
 %%% init_fields/3: creates a list of fields equal to `CFields`, 
 %%% but uses values provided by `Fields` then binds them to `FieldList`.
-init_fields([field(Name, Value, _) | Fields], CFields, [field(Name, Value, Type) | FieldList]) :-
+init_fields([field(Name, Value, _) | Fields], CFields,
+	    [field(Name, Value, Type) | FieldList]) :-
     contains(field(Name, _, Type), CFields),
     is_type(Value, Type),
     init_fields(Fields, CFields, FieldList).
