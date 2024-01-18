@@ -1,5 +1,6 @@
 %%%% Marini Filippo 900000
-%%%% Zheng Lei Maurizio 866251, Moretti Simone 894672
+%%%% Zheng Lei Maurizio 866251
+%%%% Moretti Simone 894672
 
 
 :- dynamic class/4.     %%% represents the class object

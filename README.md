@@ -1,3 +1,7 @@
+Marini Filippo 900000
+Zheng Lei Maurizio 866251
+Moretti Simone 894672
+
 # Basic Object-Oriented Programming (OOP) Extension for Prolog
 
 This Prolog extension introduces basic object-oriented programming concepts, allowing users to define classes, create instances, and work with fields and methods
