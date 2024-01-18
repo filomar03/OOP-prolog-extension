@@ -8,7 +8,9 @@
 %%% -----------------------------------------------------------------
 %%% exposed class predicates
 
-%%% def_class/3: defines a class named `Cname` with `Parents` as class parents and methods/fields from `Parts`, then asserts the class information into the database.
+%%% def_class/3: defines a class named `Cname` with `Parents` 
+%%% as class parents and methods/fields from `Parts`,
+%%% then asserts the class information into the database.
 def_class(Cname, Parents, Parts) :-
     atom(Cname),
     \+ class(Cname, _, _, _),
@@ -29,7 +31,9 @@ is_class(Cname) :-
 %%% -----------------------------------------------------------------
 %%% exposed instance predicates
 
-%%% make/3: creates an instance of a class `Cname` named as `Iname` and fields initialized from `Fields` then asserts the instance information into the database.
+%%% make/3: creates an instance of a class `Cname` named
+%%% as `Iname` and fields initialized from `Fields`, 
+%%% then asserts the instance information into the database.
 make(Iname, Cname, Fields) :-
     atom(Iname),
     !,
@@ -39,7 +43,8 @@ make(Iname, Cname, Fields) :-
     init_fields(ConvFields, ClassFields, InstFields),
     asserta(instance(Iname, Cname, InstFields)).
 
-%%% make/3: creates an instance of a class `Cname` and fields initialized from `Fields` then binds it to `Inst`.
+%%% make/3: creates an instance of a class `Cname` and 
+%%% fields initialized from `Fields` then binds it to `Inst`.
 make(Inst, Cname, Fields) :-
     var(Inst),
     !,
@@ -66,7 +71,9 @@ is_instance(Inst) :-
     check_fields(Fields, CFields).
 
 
-%%% is_instance/2: verifies that `Inst` is a valid instance, then verifies that class named `Super` is a super-class of `Inst` class. 
+%%% is_instance/2: verifies that `Inst` is a valid instance,
+%%% then verifies that class named `Super` is a 
+%%% super-class of `Inst` class. 
 is_instance(Inst, Super) :-
     is_instance(Inst),
     instance(_, Cname, _) = Inst,
@@ -87,7 +94,8 @@ inst(Iname, Inst) :-
     Inst = instance(Iname, Cname, Fields).
 
 
-%%% field/3: gets the value of the field named `Fname` from the given instance `Inst` and unifies it with `Result`.
+%%% field/3: gets the value of the field named `Fname` from the given
+%%% instance `Inst` and unifies it with `Result`.
 field(Inst, Fname, Result) :-
     is_instance(Inst),
     atom(Fname),
@@ -95,7 +103,9 @@ field(Inst, Fname, Result) :-
     contains(field(Fname, Result, _), IFields).
 
 
-%%% fieldx/3: gets the value of the first field specified in `Fnames` from the instance `Inst` and recursively uses it to extract the next field until the last one, which is then unified with `Result`.
+%%% fieldx/3: gets the value of the first field specified in `Fnames`
+%%% from the instance `Inst` and recursively uses it to extract the 
+%%% next field until the last one, which is then unified with `Result`.
 fieldx(Inst, [Fname | Fnames], Result) :-
     field(Inst, Fname, TmpResult),
     fieldx(TmpResult, Fnames, Result).
@@ -106,7 +116,8 @@ fieldx(Result, [], Result).
 %%% --------------------------------------------------
 %%% internal class helper predicates
 
-%%% parse_class/4: splits into fields and methods, handle field types and dynamic methods creation
+%%% parse_class/4: splits into fields and methods, 
+%%% handles field types and dynamic methods creation
 parse_class(Parents, [Part | Parts], [Part | Fields], Methods) :- 
     field(Name, Value, Type) = Part,
     !,
@@ -144,7 +155,8 @@ parse_class(Parents, [Part | Parts], Fields, [Part | Methods]) :-
 parse_class(_, [], [], []).
 
 
-%%% check_subtype/2: checks that the field `Field` if inherited is a subtype or the same type as the inherited one.
+%%% check_subtype/2: checks that the field `Field` if inherited 
+%%% is a subtype or the same type as the inherited one.
 check_subtype(_, []) :- !.
 
 check_subtype(field(Name, _, Type), Parents) :-
@@ -171,7 +183,8 @@ get_superfields_nc_aux([Class | Parents], Fields, Acc) :-
 get_superfields_nc_aux([], Acc, Acc).
 
 
-%%% superclass/2: checks whether the argument `Super` is a superclass of the argument `Class`.
+%%% superclass/2: checks whether the argument `Super` is a superclass
+%%% of the argument `Class`.
 superclass(Super, Class) :-
     class(Class, Parents, _, _),
     superclass_aux(Super, Parents).
@@ -185,7 +198,8 @@ superclass_aux(Super, [Parent | Parents]) :-
     superclass_aux(Super, NextParents).
 
 
-%%% patch_body/3: patches the body of a function by replacing occurrences of `this` (atom) with the variable `This`.
+%%% patch_body/3: patches the body of a function by replacing occurrences
+%%% of `this` (atom) with the variable `This`.
 patch_body(Body, This, PBody) :-
     (Stmt, Stmts) = Body,
     Stmt =.. List,
@@ -213,7 +227,8 @@ patch_stmt([Term | Terms], This, [Term | PList]) :-
 patch_stmt([], _, []).
 
 
-%%% get_method/2: retrieves the body of the method specified by the signature `Sign` and then binds it to `Body`.
+%%% get_method/2: retrieves the body of the method specified by the 
+%%% signature `Sign` and then binds it to `Body`.
 get_method(Sign, Body) :-
     Sign =.. [_, Iname | _],
     atom(Iname),
@@ -253,14 +268,16 @@ match_msign([_ | Methods], Sign, Body) :-
 %%% --------------------------------------------------
 %%% internal instance helper predicates
 
-%%% ifields_2_fields/2: converts a list of `initializers` to `fields` then binds them to `Field`. 
+%%% ifields_2_fields/2: converts a list of `initializers` to `fields`
+%%% then binds them to `Field`. 
 ifields_2_fields([Name = Value | IFields], [field(Name, Value, any) | Fields]) :-
     ifields_2_fields(IFields, Fields).
 
 ifields_2_fields([], []).
 
 
-%%% init_fields/3: creates a list of fields equal to `CFields`, but uses values provided by `Fields` then binds them to `FieldList`.
+%%% init_fields/3: creates a list of fields equal to `CFields`, 
+%%% but uses values provided by `Fields` then binds them to `FieldList`.
 init_fields([field(Name, Value, _) | Fields], CFields, [field(Name, Value, Type) | FieldList]) :-
     contains(field(Name, _, Type), CFields),
     is_type(Value, Type),
@@ -269,7 +286,8 @@ init_fields([field(Name, Value, _) | Fields], CFields, [field(Name, Value, Type)
 init_fields([], CFields, CFields).
 
 
-%%% check_fields/2: checks that instance fields are the same as class fields (except for value)
+%%% check_fields/2: checks that instance fields are the same as class
+%%% fields (except for value)
 check_fields(Ifields, Cfields) :-
     check_cfields(Cfields, Ifields),
     check_ifields(Ifields, Cfields).

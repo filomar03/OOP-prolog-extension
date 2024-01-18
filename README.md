@@ -71,15 +71,13 @@ Supported types for class fields are
 - `is_instance/1`:
   - Parameters:
     - `Inst` (instance or atom).
-  - Usage: Verifies that `Inst` is a valid instance or a name for a valid instance.
-  - Notes:
-    - This predicate also accepts the name of an instance instead of only instance object, since it was not clear in the assignment.
+  - Usage: Verifies that `Inst` is a valid instance.
 
 - `is_instance/2`:
   - Parameters: 
     - `Inst` (instance or atom).
     - `Super` (name).
-  - Usage: Verifies that `Inst` is a valid instance or a name for a valid instance, then verifies that class named `Super` is a super-class (every class is a superclass of itself as specified [here](https://elearning.unimib.it/mod/forum/discuss.php?d=253566)) of `Inst` class. 
+  - Usage: Verifies that `Inst` is a valid instance, then verifies that class named `Super` is a super-class (every class is a superclass of itself as specified [here](https://elearning.unimib.it/mod/forum/discuss.php?d=253566)) of `Inst` class. 
 
 - `inst/2`:
   - Parameters: 
@@ -92,14 +90,14 @@ Supported types for class fields are
     - `Inst` (instance or atom).
     - `Fname` (atom).
     - `Result` (variable).
-  - Usage: Gets the value of the field named `Fname` from the given instance/instance named `Inst` and unifies it with `Result`.
+  - Usage: Gets the value of the field named `Fname` from the given instance `Inst` and unifies it with `Result`.
 
 - `fieldx/3`:
   - Parameters: 
     - `Inst` (instance or atom).
     - `Fnames` (list atoms).
     - `Result` (variable).
-  - Usage: Gets the value of the first field specified in `Fnames` from the instance/instance named `Inst` and recursively uses it to extract the next field until the last one, which is then unified with `Result`.
+  - Usage: Gets the value of the first field specified in `Fnames` from the instance `Inst` and recursively uses it to extract the next field until the last one, which is then unified with `Result`.
 
 ---
 
@@ -168,7 +166,6 @@ Supported types for class fields are
   - Parameters: 
     - `IFields` (list of fields).
     - `CFields` (list of fields).
-  - Usage: Checks that the 2 lists of fields are identical.
-  - Notes: The order of the fields inside the list must also be the same, otherwise it will fail.
+  - Usage: Checks that `IFields` contains all the fields from `CFields` and nothing more
 
 **If some predicates haven't been mentioned, it's because they are only needed to support those mentioned and are not intended to be used on their own, or they are utility which are not strictly related to this project**
