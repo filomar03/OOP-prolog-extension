@@ -1,6 +1,7 @@
-Marini Filippo 900000
-Zheng Lei Maurizio 866251
-Moretti Simone 894672
+## Developed by:
+Marini Filippo 900000, 
+Zheng Lei Maurizio 866251, 
+Moretti Simone 894672.
 
 # Basic Object-Oriented Programming (OOP) Extension for Prolog
 
@@ -115,7 +116,7 @@ Supported types for class fields are
     - `Parts` (list of atoms).
     - `Fields` (variable).
     - `Methods` (variable).
-  - Usage: Splits into fields and methods, handle field types and dynamic methods creation
+  - Usage: Splits into fields and methods, handle field types and dynamic methods creation.
 
 - `check_subtype/2`:
   - Parameters: 
@@ -127,21 +128,21 @@ Supported types for class fields are
   - Parameters: 
     - `Cname` (atom).
     - `Acc` (variable).
-  - Usage: Retrieves the fields (own + inherited) of class `Cname` and binds them to `Acc`
+  - Usage: Retrieves the fields (own + inherited) of class `Cname` and binds them to `Acc`.
 
 - `superclass/2`:
   - Parameters: 
     - `Super` (atom), 
     - `Class` (atom).
-  - Usage: Checks whether the argument `Super` is a superclass of the argument `Class`.
+  - Usage: Checks whether the argument `Super` is a superclass of the argument. `Class`.
   - Notes:
-    - In this predicate a class is not considered a superclass of itself
+    - In this predicate a class is not considered a superclass of itself.
 
 - `patch_body/3`:
   - Parameters: -
     - `Body` (callable), `This` (variable), `PBody` (variable).
   - Usage: Patches the body of a function by replacing occurrences of `this` (atom) with the variable `This`.
-  - Note: `This` must be unified before going out of scope, for this function to be effective, basically this method doesn't allow to statically patch a method, instead it must be done at runtime. I implemented it this way because i thought it was cleaner since, in Prolog we don't really care about performance 
+  - Note: `This` must be unified before going out of scope, for this function to be effective, basically this method doesn't allow to statically patch a method, instead it must be done at runtime. I implemented it this way because i thought it was cleaner since, in Prolog we don't really care about performance.
 
 - `get_method/2`:
   - Parameters: 
@@ -170,6 +171,6 @@ Supported types for class fields are
   - Parameters: 
     - `IFields` (list of fields).
     - `CFields` (list of fields).
-  - Usage: Checks that `IFields` contains all the fields from `CFields` and nothing more
+  - Usage: Checks that `IFields` contains all the fields from `CFields` and nothing more.
 
-**If some predicates haven't been mentioned, it's because they are only needed to support those mentioned and are not intended to be used on their own, or they are utility which are not strictly related to this project**
+**If some predicates haven't been mentioned, it's because they are only needed to support those mentioned and are not intended to be used on their own, or they are utility which are not strictly related to this project.**
